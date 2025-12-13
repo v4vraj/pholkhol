@@ -40,9 +40,15 @@ router = APIRouter(prefix="/api", tags=["auth"])
 class UserCreate(BaseModel):
     username: constr(min_length=3, max_length=32)
     email: EmailStr
-    password: constr(min_length=8, max_length=512) 
+    password: constr(min_length=8, max_length=512)
+
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+
+    age: Optional[int] = None
+    location: Optional[str] = None
+    gender: Optional[str] = None
+    occupation: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str
@@ -103,16 +109,41 @@ def register(user: UserCreate):
         hashed = get_password_hash(user.password) 
         
         result = conn.execute(text("""
-            INSERT INTO users (username, email, first_name, last_name, hashed_password)
-            VALUES (:username, :email, :first_name, :last_name, :hashed_password)
+            INSERT INTO users (
+                username,
+                email,
+                first_name,
+                last_name,
+                age,
+                location,
+                gender,
+                occupation,
+                hashed_password
+            )
+            VALUES (
+                :username,
+                :email,
+                :first_name,
+                :last_name,
+                :age,
+                :location,
+                :gender,
+                :occupation,
+                :hashed_password
+            )
             RETURNING id, username, email
-        """), {
-            "username": user.username,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "hashed_password": hashed
-        })
+            """), {
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "age": user.age,
+                "location": user.location,
+                "gender": user.gender,
+                "occupation": user.occupation,
+                "hashed_password": hashed
+            })
+
         created = result.fetchone()
         return {"id": str(created.id), "username": created.username, "email": created.email}
 

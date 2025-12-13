@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:wght@400;500&display=swap");
+
+/* Global body font */
+body {
+  font-family: "Lora", serif;
+}
+
+/* Classy serif headings */
+h1,
+h2,
+h3 {
+  font-family: "Playfair Display", serif;
+}
+
+@layer base {
+  :root {
+    --muted: #6b7280;
+    --card: #ffffff;
+    --page: #fbfcfd;
+    --border: #e6e9ee;
+    font-size: 18px;
+  }
+
+  html,
+  body {
+    background-color: var(--page);
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* neutral outline button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold
+           bg-orange-500 text-white shadow-sm transition;
+  }
+
+  .btn-primary:hover {
+    @apply bg-orange-600;
+  }
+
+  .btn-primary:active {
+    @apply bg-orange-700 scale-[0.98];
+  }
+
+  /* quiet primary action (filled but subtle) */
+  .btn-subtle {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold bg-slate-900 text-white shadow-sm;
+  }
+
+  /* input */
+  .input-plain {
+    @apply w-full px-3 py-2 rounded-lg border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100;
+  }
+
+  /* card */
+  .card {
+    @apply bg-white rounded-2xl p-6 border border-slate-100 shadow-sm;
+  }
+}
