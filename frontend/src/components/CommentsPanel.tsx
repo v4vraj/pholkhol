@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -57,7 +57,7 @@ export default function CommentsPanel({
 
   const postComment = async () => {
     if (!token || !text.trim()) return;
-
+    setPosting(true);
     try {
       const res = await fetch(`${API_BASE}/api/posts/${postId}/comments`, {
         method: "POST",

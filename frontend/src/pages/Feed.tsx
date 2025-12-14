@@ -213,6 +213,27 @@ export default function Feed() {
         ))}
       </div>
 
+      {/* 🔥 FIX: Render the error message if present */}
+      {error && (
+        <div className="p-4 mb-4 text-red-700 bg-red-100 border border-red-200 rounded-lg">
+          Error loading feed: {error}
+        </div>
+      )}
+
+      {/* Show message if there are no posts after filtering/loading */}
+      {!loading && posts.length === 0 && !error && (
+        <div className="text-center p-8 text-slate-500 bg-white rounded-lg border border-slate-100 shadow-sm">
+          No posts found. Try adjusting your filters or{" "}
+          <a
+            onClick={() => navigate("/create")}
+            className="text-orange-500 font-medium cursor-pointer"
+          >
+            create a new post
+          </a>
+          .
+        </div>
+      )}
+
       {/* Feed */}
       <div className="space-y-4">
         {visiblePosts.map((p) => {
@@ -235,7 +256,15 @@ export default function Feed() {
                   </div>
                 </div>
                 <span
-                  className={`px-2 py-1 rounded-full text-xs font-semibold ${sev.cls}`}
+                  className={`
+                    inline-flex items-center
+                    px-2.5 py-1
+                    rounded-full
+                    text-[11px] font-semibold
+                    whitespace-nowrap
+                    flex-shrink-0
+                    ${sev.cls}
+                  `}
                 >
                   {sev.label}
                 </span>
