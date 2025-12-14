@@ -190,6 +190,7 @@ def list_posts(
                   p.image_url,
                   p.lat,
                   p.lng,
+                  p.status,
                   p.severity_score,
                   p.authenticity_score,
                   p.composite_score,
@@ -233,6 +234,7 @@ def list_posts(
                     "image_url": r.image_url,
                     "lat": float(r.lat) if r.lat is not None else None,
                     "lng": float(r.lng) if r.lng is not None else None,
+                    "status": r.status,
                     "severity_score": float(r.severity_score) if r.severity_score is not None else None,
                     "authenticity_score": float(r.authenticity_score) if r.authenticity_score is not None else None,
                     "composite_score": float(r.composite_score) if r.composite_score is not None else None,
@@ -392,3 +394,191 @@ def create_comment(
         raise HTTPException(status_code=500, detail=f"DB error: {e}")
 
     return created
+
+@app.get("/api/posts/{post_id}")
+def get_post(
+    post_id: str = Path(...),
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        with engine.begin() as conn:
+            r = conn.execute(text("""
+                SELECT
+                  p.id,
+                  p.description,
+                  p.image_url,
+                  p.lat,
+                  p.lng,
+                  p.status,
+                  p.severity_score,
+                  p.authenticity_score,
+                  p.composite_score,
+                  p.created_at,
+                  u.id AS user_id,
+                  u.username AS user_username,
+                  u.first_name AS user_first_name,
+                  u.last_name AS user_last_name,
+                  COALESCE(vs.upvotes,0) AS upvotes,
+                  COALESCE(vs.downvotes,0) AS downvotes,
+                  COALESCE(vc.user_vote,0) AS user_vote,
+                  COALESCE(cc.comments_count,0) AS comments_count
+                FROM posts p
+                LEFT JOIN users u ON p.user_id = u.id
+                LEFT JOIN (
+                  SELECT post_id,
+                    SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END) AS upvotes,
+                    SUM(CASE WHEN vote = -1 THEN 1 ELSE 0 END) AS downvotes
+                  FROM votes
+                  GROUP BY post_id
+                ) vs ON vs.post_id = p.id
+                LEFT JOIN (
+                  SELECT post_id, COUNT(1) AS comments_count
+                  FROM comments
+                  GROUP BY post_id
+                ) cc ON cc.post_id = p.id
+                LEFT JOIN (
+                  SELECT post_id, vote AS user_vote
+                  FROM votes
+                  WHERE user_id = :uid
+                ) vc ON vc.post_id = p.id
+                WHERE p.id = :pid
+            """), {"pid": post_id, "uid": current_user["id"]}).fetchone()
+
+            if not r:
+                raise HTTPException(status_code=404, detail="Post not found")
+
+            post = {
+                "id": str(r.id),
+                "description": r.description,
+                "image_url": r.image_url,
+                "lat": float(r.lat) if r.lat is not None else None,
+                "lng": float(r.lng) if r.lng is not None else None,
+                "status": r.status,
+                "severity_score": float(r.severity_score) if r.severity_score is not None else None,
+                "authenticity_score": float(r.authenticity_score) if r.authenticity_score is not None else None,
+                "composite_score": float(r.composite_score) if r.composite_score is not None else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "user": {
+                    "id": str(r.user_id) if r.user_id else None,
+                    "username": r.user_username,
+                    "first_name": r.user_first_name,
+                    "last_name": r.user_last_name,
+                },
+                "upvotes": int(r.upvotes),
+                "downvotes": int(r.downvotes),
+                "user_vote": int(r.user_vote or 0),
+                "comments_count": int(r.comments_count),
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB error: {e}")
+
+    return post
+
+@app.get("/api/map/posts")
+def get_posts_for_map(
+    min_lat: float = Query(...),
+    max_lat: float = Query(...),
+    min_lng: float = Query(...),
+    max_lng: float = Query(...),
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(text("""
+                SELECT
+                  id,
+                  lat,
+                  lng,
+                  status,
+                  severity_score,
+                  composite_score
+                FROM posts
+                WHERE lat BETWEEN :min_lat AND :max_lat
+                  AND lng BETWEEN :min_lng AND :max_lng
+            """), {
+                "min_lat": min_lat,
+                "max_lat": max_lat,
+                "min_lng": min_lng,
+                "max_lng": max_lng,
+            }).fetchall()
+
+            items = [
+                {
+                    "id": str(r.id),
+                    "lat": float(r.lat),
+                    "lng": float(r.lng),
+                    "severity": float(r.severity_score) if r.severity_score else 0,
+                    "score": float(r.composite_score) if r.composite_score else 0,
+                    "status": r.status,
+                }
+                for r in rows
+            ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"items": items}
+
+@app.get("/api/me")
+def get_my_profile(current_user: dict = Depends(get_current_user)):
+    try:
+        with engine.begin() as conn:
+            r = conn.execute(text("""
+                SELECT
+                  u.id,
+                  u.username,
+                  u.first_name,
+                  u.last_name,
+                  (SELECT COUNT(*) FROM posts p WHERE p.user_id = u.id) AS posts_count,
+                  (SELECT COUNT(*) FROM votes v WHERE v.user_id = u.id) AS votes_count,
+                  (SELECT COUNT(DISTINCT lat::text || lng::text)
+                   FROM posts p WHERE p.user_id = u.id) AS areas_count
+                FROM users u
+                WHERE u.id = :uid
+            """), {"uid": current_user["id"]}).fetchone()
+
+            return {
+                "id": str(r.id),
+                "username": r.username,
+                "first_name": r.first_name,
+                "last_name": r.last_name,
+                "posts_count": int(r.posts_count),
+                "votes_count": int(r.votes_count),
+                "areas_count": int(r.areas_count or 0),
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.get("/api/me/posts")
+def my_posts(current_user: dict = Depends(get_current_user)):
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(text("""
+                SELECT
+                  id,
+                  description,
+                  image_url,
+                  created_at,
+                  severity_score,
+                  status
+                FROM posts
+                WHERE user_id = :uid
+                ORDER BY created_at DESC
+            """), {"uid": current_user["id"]}).fetchall()
+
+            items = [{
+                "id": str(r.id),
+                "description": r.description,
+                "image_url": r.image_url,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "severity_score": float(r.severity_score) if r.severity_score else None,
+                "status": r.status,
+            } for r in rows]
+
+            return {"items": items}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

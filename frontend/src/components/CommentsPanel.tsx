@@ -14,7 +14,13 @@ type Comment = {
   };
 };
 
-export default function CommentsPanel({ postId }: { postId: string }) {
+export default function CommentsPanel({
+  postId,
+  onCommentAdded,
+}: {
+  postId: string;
+  onCommentAdded?: () => void;
+}) {
   const token =
     typeof window !== "undefined" ? sessionStorage.getItem("token") : null;
   const [items, setItems] = useState<Comment[]>([]);
@@ -50,12 +56,8 @@ export default function CommentsPanel({ postId }: { postId: string }) {
   }, [postId]);
 
   const postComment = async () => {
-    if (!token) {
-      alert("Please log in to comment");
-      return;
-    }
-    if (!text.trim()) return;
-    setPosting(true);
+    if (!token || !text.trim()) return;
+
     try {
       const res = await fetch(`${API_BASE}/api/posts/${postId}/comments`, {
         method: "POST",
@@ -65,18 +67,17 @@ export default function CommentsPanel({ postId }: { postId: string }) {
         },
         body: JSON.stringify({ content: text.trim() }),
       });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || `Failed to post comment (${res.status})`);
-      }
+
+      if (!res.ok) throw new Error("Failed to post comment");
+
       const created = await res.json();
-      // add to top
-      setItems((s) => [created, ...s]);
+
+      setItems((prev) => [created, ...prev]);
       setText("");
-    } catch (err: any) {
-      alert("Could not post comment: " + (err?.message ?? ""));
-    } finally {
-      setPosting(false);
+
+      onCommentAdded?.(); // ✅ notify parent
+    } catch (err) {
+      alert("Could not post comment");
     }
   };
 
