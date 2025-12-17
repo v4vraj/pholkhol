@@ -1,54 +1,33 @@
-import os
 import httpx
+import os
 
-# --- Kestra Configuration (Match the Postman Target) ---
 KESTRA_URL = os.getenv("KESTRA_URL", "http://localhost:8080")
-KESTRA_NAMESPACE = "pohtol.hacks"  # Fixed to match Postman URL
-KESTRA_FLOW_ID = "issue-recognition"  # Fixed to match Postman URL
+KESTRA_NAMESPACE = "pohtol.hacks"
+KESTRA_FLOW_ID = "issue-recognition"
 
-# --- Credentials from Postman Request ---
 KESTRA_USERNAME = os.getenv("KESTRA_USERNAME", "vraj1763@gmail.com")
 KESTRA_PASSWORD = os.getenv("KESTRA_PASSWORD", "Vraj2003@")
 
 
-async def trigger_kestra(post_id: str, timeout: int = 10):
-    """
-    Trigger a Kestra flow asynchronously using Basic Auth, matching the Postman configuration.
-    Safe: does not raise errors to the caller, only logs.
-    """
-    # 1. CONSTRUCT THE TARGET URL:
-    # Uses the direct execution endpoint from the Postman request.
-    target_url = (
-        f"{KESTRA_URL}/api/v1/main/executions/{KESTRA_NAMESPACE}/{KESTRA_FLOW_ID}"
-    )
+def trigger_kestra(post_id: str, timeout: int = 10):
+    print("🔥 KESTRA TRIGGER FUNCTION CALLED")
 
-    # 2. CONSTRUCT THE PAYLOAD (inputs for the flow):
-    # Kestra's execution API uses the inputs object for flow execution.
-    payload = {
-        "inputs": {
-            "post_id": post_id,
-        }
+    url = f"{KESTRA_URL}/api/v1/main/executions/{KESTRA_NAMESPACE}/{KESTRA_FLOW_ID}"
+
+    # ✅ Force multipart/form-data
+    files = {
+        "post_id": (None, post_id)
     }
 
-    headers = {"Content-Type": "application/json"}
-    
-    # 3. CONSTRUCT BASIC AUTH TUPLE:
-    auth_credentials = (KESTRA_USERNAME, KESTRA_PASSWORD)
+    auth = (KESTRA_USERNAME, KESTRA_PASSWORD)
 
-    try:
-        # 4. ADD 'auth' TO HTTPX CLIENT
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                target_url,
-                json=payload,
-                headers=headers,
-                auth=auth_credentials  # <<< ADDED BASIC AUTHENTICATION
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            print(f"[Kestra] Execution started: {data.get('id')}")
-            return data
-
-    except Exception as e:
-        print(f"[WARNING] Kestra trigger failed for post {post_id}: {e}")
-        return None
+    with httpx.Client(timeout=timeout) as client:
+        resp = client.post(
+            url,
+            files=files,   # ✅ THIS is the key
+            auth=auth
+        )
+        print("STATUS:", resp.status_code)
+        print("RESPONSE:", resp.text)
+        resp.raise_for_status()
+        print("[Kestra] Execution started:", resp.json())

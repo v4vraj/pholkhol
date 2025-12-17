@@ -108,7 +108,7 @@ async def create_post_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB error: {e}")
 
-    background_tasks.add_task(trigger_kestra, post_id, object_url)
+    background_tasks.add_task(trigger_kestra, post_id)
 
 
     return {"post_id": post_id, "image_url": object_url, "status": "PENDING"}
@@ -141,7 +141,7 @@ def create_upload_url(req: UploadRequest, current_user: dict = Depends(get_curre
     return UploadResponse(url=presigned["url"], fields=presigned["fields"], object_url=object_url)
 
 @app.post("/api/post")
-def create_post(payload: PostCreate, current_user: dict = Depends(get_current_user)):
+def create_post(background_tasks: BackgroundTasks,payload: PostCreate, current_user: dict = Depends(get_current_user)):
     """
     Client calls this AFTER they have uploaded the file directly to MinIO
     using the presigned POST /api/upload-url. This endpoint simply registers the post.
@@ -168,6 +168,8 @@ def create_post(payload: PostCreate, current_user: dict = Depends(get_current_us
             })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB error: {e}")
+    
+    background_tasks.add_task(trigger_kestra, post_id)
 
     return {"post_id": post_id, "image_url": payload.image_url, "status": "PENDING"}
 
